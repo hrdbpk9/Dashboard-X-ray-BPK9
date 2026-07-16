@@ -13,7 +13,7 @@ const SHEETS = {
 };
 
 // ตั้งค่า URL ของ Apps Script Web App หลัง deploy แล้ว (ดูขั้นตอนใน apps-script/Code.gs)
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/PASTE_YOUR_DEPLOYMENT_ID_HERE/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz0t-MNKInkcsvqE4WaAtwTkm6Uod7xX1F2WwqUVHBNSYS-S4MyzjnNy84cjyXC7p406Q/exec";
 
 /* ---------- gviz fetch (อ่านข้อมูลจาก Google Sheet ผ่าน docs.google.com — ไม่โดนบล็อกโดย wifi รพ.) ---------- */
 async function fetchGvizSheet(sheetName) {
