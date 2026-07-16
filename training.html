@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ข้อมูลอบรม | แผนกรังสีวิทยา BPK9</title>
+<link rel="icon" href="assets/bpk9-logo.png" />
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+
+<header class="topbar"><div id="app-header"></div></header>
+
+<main class="shell">
+  <section class="pagehead">
+    <div class="eyebrow"><span class="dot"></span>บันทึกเข้าชีต “ข้อมูลอบรม”</div>
+    <h1 class="page-title">ข้อมูลอบรม</h1>
+    <p class="page-sub">สร้างหลักสูตรอบรมและบันทึกรายชื่อผู้เข้าร่วมทั้งหมดในฟอร์มเดียว ข้อมูลจะถูกบันทึกเข้า Google Sheet ของแผนกโดยอัตโนมัติ</p>
+  </section>
+
+  <div class="card card-pad">
+    <div class="section-title"><span class="num">1</span>ข้อมูลหลักสูตร</div>
+    <form id="training-form">
+      <div class="form-grid">
+        <div class="field span2">
+          <label for="courseName">ชื่อหลักสูตร *</label>
+          <input type="text" id="courseName" required placeholder="เช่น Basic Radiation Safety ประจำปี 2569" />
+        </div>
+        <div class="field">
+          <label for="courseDate">วันที่อบรม *</label>
+          <input type="date" id="courseDate" required />
+        </div>
+        <div class="field">
+          <label for="instructor">วิทยากร</label>
+          <input type="text" id="instructor" placeholder="ชื่อวิทยากร" />
+        </div>
+        <div class="field">
+          <label for="timeStart">เวลาเริ่ม</label>
+          <input type="time" id="timeStart" />
+        </div>
+        <div class="field">
+          <label for="timeEnd">เวลาสิ้นสุด</label>
+          <input type="time" id="timeEnd" />
+        </div>
+        <div class="field span2">
+          <label for="location">สถานที่จัดอบรม</label>
+          <input type="text" id="location" placeholder="เช่น ห้องประชุมแผนกรังสีวิทยา ชั้น 1" />
+        </div>
+      </div>
+
+      <div class="section-title"><span class="num">2</span>รายชื่อผู้เข้าร่วมอบรม</div>
+      <div id="attendee-rows"></div>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-add-row">+ เพิ่มรายชื่อ</button>
+      <p class="hint" style="margin-top:8px;">กรอกอย่างน้อย 1 คน · ชื่อ-สกุลจำเป็นต้องกรอก ส่วนช่องอื่นเว้นว่างได้หากไม่มีข้อมูล</p>
+
+      <div class="flex gap-12" style="margin-top:28px;flex-wrap:wrap;">
+        <button type="submit" class="btn btn-primary" id="btn-submit">💾 บันทึกข้อมูลอบรม</button>
+        <button type="button" class="btn btn-outline" id="btn-reset">ล้างฟอร์ม</button>
+      </div>
+      <p class="hint" id="submit-note" style="margin-top:10px;"></p>
+    </form>
+  </div>
+
+  <section class="pagehead" style="padding-top:46px;">
+    <div class="eyebrow"><span class="dot"></span>สรุปย้อนหลัง</div>
+    <h1 class="page-title" style="font-size:24px;">ประวัติการอบรมของแผนก</h1>
+    <p class="page-sub">อ่านจากชีต “ข้อมูลอบรม” — สรุปตามหลักสูตร ค้นหารายชื่อผู้เข้าร่วมได้</p>
+  </section>
+
+  <div class="kpis" id="kpis">
+    <div class="kpi"><div class="k-label">หลักสูตรทั้งหมด</div><div class="k-value">–</div></div>
+    <div class="kpi"><div class="k-label">ผู้เข้าร่วมสะสม</div><div class="k-value">–</div></div>
+    <div class="kpi"><div class="k-label">ชั่วโมงอบรมสะสม</div><div class="k-value">–</div></div>
+    <div class="kpi"><div class="k-label">อบรมล่าสุด</div><div class="k-value">–</div></div>
+  </div>
+
+  <div class="card card-pad">
+    <div class="toolbar">
+      <div class="field" style="flex:1;min-width:220px;">
+        <label for="f-search">ค้นหาหลักสูตร / ชื่อผู้เข้าร่วม</label>
+        <input type="text" id="f-search" placeholder="เช่น Basic Radiation หรือ ชุติกาญจน์" />
+      </div>
+      <button class="btn btn-primary" id="btn-refresh" style="align-self:flex-end;margin-left:auto;">🔄 รีเฟรชข้อมูล</button>
+    </div>
+    <div id="history-content">
+      <div class="state-msg"><div class="spinner"></div><span>กำลังโหลดประวัติการอบรม…</span></div>
+    </div>
+  </div>
+
+  <footer id="app-footer"></footer>
+</main>
+
+<script src="assets/common.js"></script>
+<script>
+/* ---------------- attendee rows ---------------- */
+const rowsWrap = document.getElementById("attendee-rows");
+let rowCount = 0;
+
+function addRow() {
+  rowCount++;
+  const id = rowCount;
+  const div = document.createElement("div");
+  div.className = "attendee-row";
+  div.dataset.id = id;
+  div.innerHTML = `
+    <div class="field"><label>ชื่อ-สกุล *</label><input type="text" class="a-name" placeholder="ชื่อ-สกุล" /></div>
+    <div class="field"><label>ตำแหน่ง/วิชาชีพ</label><input type="text" class="a-role" placeholder="เช่น นักรังสีเทคนิค" /></div>
+    <div class="field"><label>รหัสพนักงาน</label><input type="text" class="a-empid" placeholder="8 หลัก" /></div>
+    <div class="field"><label>แผนก/หน่วยงาน</label><input type="text" class="a-dept" placeholder="รังสีวิทยา" /></div>
+    <div class="field"><label>ชม.</label><input type="number" min="0" step="0.5" class="a-hours" /></div>
+    <div class="field"><label>Pre-test</label><input type="number" min="0" class="a-pre" /></div>
+    <div class="field"><label>Post-test</label><input type="number" min="0" class="a-post" /></div>
+    <button type="button" class="row-remove" title="ลบแถวนี้">✕</button>`;
+  div.querySelector(".row-remove").addEventListener("click", () => {
+    div.remove();
+    if (!rowsWrap.children.length) addRow();
+  });
+  rowsWrap.appendChild(div);
+}
+document.getElementById("btn-add-row").addEventListener("click", addRow);
+addRow(); // start with one row
+
+document.getElementById("btn-reset").addEventListener("click", () => {
+  document.getElementById("training-form").reset();
+  rowsWrap.innerHTML = "";
+  addRow();
+});
+
+/* ---------------- submit ---------------- */
+document.getElementById("training-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+
+  const courseName = document.getElementById("courseName").value.trim();
+  const courseDate = document.getElementById("courseDate").value;
+  if (!courseName || !courseDate) { showToast("กรุณากรอกชื่อหลักสูตรและวันที่อบรม", "error"); return; }
+
+  const attendees = [...rowsWrap.querySelectorAll(".attendee-row")].map(row => ({
+    name: row.querySelector(".a-name").value.trim(),
+    role: row.querySelector(".a-role").value.trim(),
+    empId: row.querySelector(".a-empid").value.trim(),
+    dept: row.querySelector(".a-dept").value.trim(),
+    hours: row.querySelector(".a-hours").value.trim(),
+    pre: row.querySelector(".a-pre").value.trim(),
+    post: row.querySelector(".a-post").value.trim(),
+  })).filter(a => a.name !== "");
+
+  if (!attendees.length) { showToast("กรุณากรอกชื่อผู้เข้าร่วมอย่างน้อย 1 คน", "error"); return; }
+
+  if (APPS_SCRIPT_URL.includes("PASTE_YOUR_DEPLOYMENT_ID_HERE")) {
+    showToast("ยังไม่ได้ตั้งค่า Apps Script URL — ดูขั้นตอนใน apps-script/Code.gs", "error");
+    return;
+  }
+
+  const payload = {
+    courseName,
+    courseDate,
+    timeStart: document.getElementById("timeStart").value,
+    timeEnd: document.getElementById("timeEnd").value,
+    instructor: document.getElementById("instructor").value.trim(),
+    location: document.getElementById("location").value.trim(),
+    attendeesJSON: JSON.stringify(attendees),
+  };
+
+  // ส่งข้อมูลด้วยการ submit form จริง (ไม่ใช้ fetch/AJAX) เพราะ script.google.com
+  // มักถูกบล็อกโดย wifi รพ. เมื่อเรียกแบบ AJAX ข้ามโดเมน — การ submit แบบฟอร์มปกติ
+  // เป็นการเปิดหน้าเว็บตรงไปยัง Apps Script จึงใช้งานได้ตามปกติ
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = APPS_SCRIPT_URL;
+  form.target = "_blank";
+  Object.entries(payload).forEach(([k, v]) => {
+    const input = document.createElement("input");
+    input.type = "hidden"; input.name = k; input.value = v;
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+  document.body.removeChild(form);
+
+  document.getElementById("submit-note").innerHTML =
+    `กำลังเปิดแท็บใหม่เพื่อบันทึกข้อมูล — เมื่อเห็นข้อความ "บันทึกสำเร็จ" แล้วสามารถปิดแท็บนั้นและกลับมาที่นี่ได้ (ข้อมูลจะปรากฏในตารางประวัติด้านล่างหลังกดรีเฟรช)`;
+  showToast(`ส่งข้อมูลหลักสูตร “${courseName}” (${attendees.length} คน) แล้ว`);
+});
+
+/* ---------------- history ---------------- */
+let HIST_ROWS = [];
+
+async function loadHistory() {
+  const el = document.getElementById("history-content");
+  try {
+    const { cols, rows } = await fetchGvizSheet(SHEETS.training);
+    const objs = rowsToObjects(cols, rows).filter(r => (r["ชื่อหลักสูตร"] || "") !== "");
+    HIST_ROWS = objs;
+    renderHistory();
+  } catch (err) {
+    el.innerHTML = `<div class="state-msg"><div class="s-icon">ℹ️</div><b>ยังไม่พบข้อมูลประวัติ</b><span>${escapeHTML(err.message)} — เมื่อมีการบันทึกหลักสูตรแรกแล้ว ประวัติจะแสดงที่นี่</span></div>`;
+  }
+}
+
+function renderHistory() {
+  const q = document.getElementById("f-search").value.trim().toLowerCase();
+  let rows = HIST_ROWS;
+  if (q) {
+    rows = rows.filter(r =>
+      (r["ชื่อหลักสูตร"] || "").toLowerCase().includes(q) ||
+      (r["ชื่อ-สกุลผู้เข้าร่วม"] || "").toLowerCase().includes(q)
+    );
+  }
+
+  // KPIs from full dataset
+  const courses = new Set(HIST_ROWS.map(r => r["ชื่อหลักสูตร"] + "|" + r["วันที่อบรม"]));
+  const people = HIST_ROWS.length;
+  const totalHours = HIST_ROWS.reduce((s, r) => s + (parseFloat(r["จำนวนชั่วโมง"]) || 0), 0);
+  const dates = HIST_ROWS.map(r => parseGvizDate(r["วันที่อบรม"])).filter(Boolean);
+  const latest = dates.length ? dates.reduce((m, d) => d > m ? d : m, dates[0]) : null;
+
+  const kpiEls = document.querySelectorAll("#kpis .k-value");
+  kpiEls[0].innerHTML = `${courses.size}<small>หลักสูตร</small>`;
+  kpiEls[1].innerHTML = `${people}<small>คน-ครั้ง</small>`;
+  kpiEls[2].innerHTML = `${totalHours.toFixed(1)}<small>ชม.</small>`;
+  kpiEls[3].innerHTML = latest ? toBEDate(latest) : "-";
+
+  const el = document.getElementById("history-content");
+  if (!rows.length) {
+    el.innerHTML = `<div class="state-msg"><div class="s-icon">🔍</div><b>ไม่พบข้อมูล</b><span>ลองค้นหาด้วยคำอื่น หรือบันทึกหลักสูตรใหม่ด้านบน</span></div>`;
+    return;
+  }
+
+  const body = rows.map(r => `
+    <tr>
+      <td>${escapeHTML(r["วันที่อบรม"])}</td>
+      <td><b>${escapeHTML(r["ชื่อหลักสูตร"])}</b><br/><span class="muted text-sm">${escapeHTML(r["วิทยากร"] || "")}</span></td>
+      <td>${escapeHTML(r["ชื่อ-สกุลผู้เข้าร่วม"])}</td>
+      <td>${escapeHTML(r["ตำแหน่ง/วิชาชีพ"] || "-")}</td>
+      <td>${escapeHTML(r["แผนก/หน่วยงาน"] || "-")}</td>
+      <td class="mono">${escapeHTML(r["จำนวนชั่วโมง"] || "-")}</td>
+      <td class="mono">${escapeHTML(r["คะแนน Pre-test"] || "-")} → ${escapeHTML(r["คะแนน Post-test"] || "-")}</td>
+    </tr>`).join("");
+
+  el.innerHTML = `
+    <p class="hint" style="margin:2px 0 12px;">พบ ${rows.length} รายการ</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>วันที่</th><th>หลักสูตร</th><th>ผู้เข้าร่วม</th><th>ตำแหน่ง</th><th>แผนก</th><th>ชม.</th><th>Pre → Post</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>`;
+}
+
+document.getElementById("f-search").addEventListener("input", renderHistory);
+document.getElementById("btn-refresh").addEventListener("click", loadHistory);
+loadHistory();
+</script>
+</body>
+</html>
